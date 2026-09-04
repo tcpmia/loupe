@@ -59,8 +59,8 @@ CLI, env vars, or `.loupe.json` — those live in `action`.
 `packages/harness/src/index.ts`:
 
 - `Harness` = `{ name, credentialKeys, available(), review(ctx) }`.
-- `HarnessContext` = `{ systemPrompt, userPrompt, model?, agentic?, workdir, env,
-  logger }`.
+- `HarnessContext` = `{ systemPrompt, userPrompt, model?, fallbackModels?,
+  agentic?, workdir, env, logger }`.
 - `review` runs the CLI to completion and returns its raw stdout (the review
   JSON); the core parses it. Adapters stay dumb.
 - `runCli` (generic) pipes the prompt on stdin — used by `claude`
@@ -69,7 +69,8 @@ CLI, env vars, or `.loupe.json` — those live in `action`.
   stream live: `reasoning`/`text` deltas become throttled `thinking` /
   `streaming reply` logs, `tool_start`/`tool_end` become `tool call` logs; it
   reassembles the assistant text from the stream. whip uses `-max-turns 40`
-  agentic / `10` one-shot as a safety cap, `-system`, and `-m <model>`.
+  agentic / `10` one-shot as a safety cap, `-system`, `-m <model>`, and optional
+  ordered `-fallback-models <model,...>`.
 - `registry()` maps name → harness; `getHarness(name)` throws with the known set.
 
 ## action files

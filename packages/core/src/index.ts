@@ -83,6 +83,8 @@ export type ReviewRequest = {
   readonly dryRun?: boolean;
   /** Model id passed to the harness (e.g. "kimi-k3"). */
   readonly model?: string;
+  /** Ordered OpenRouter fallback model ids passed through to whip. */
+  readonly fallbackModels?: readonly string[];
   /** Reasoning effort baked into the system prompt (default medium). */
   readonly reasoning: ReasoningEffort;
   /** Custom reviewer guidance replacing the default; contract is still appended. */
@@ -326,6 +328,7 @@ export async function runReview(req: ReviewRequest): Promise<ReviewResult> {
             }),
         userPrompt: useAgentic ? agenticUserPrompt : headlessUserPrompt,
         model,
+        fallbackModels: req.fallbackModels,
         agentic: useAgentic,
         workdir: harnessCwd,
         env: req.harnessEnv,
@@ -465,6 +468,7 @@ async function verifyInline(
       systemPrompt: buildVerifySystemPrompt(),
       userPrompt: buildVerifyUserPrompt(findings, files),
       model: req.model,
+      fallbackModels: req.fallbackModels,
       agentic: false,
       workdir: harnessCwd,
       env: req.harnessEnv,

@@ -34,6 +34,7 @@ whose globs match a changed file and posts each as its own labeled review
 | `include` | no | Globs; reviewer runs only when a changed file matches. **Omit = the whole PR.** |
 | `exclude` | no | Globs removed from scope (lockfiles, generated output, …). |
 | `model` | no | Overrides the run's model for this reviewer. |
+| `fallbackModels` | no | Ordered OpenRouter fallback model ids; replaces the top-level list for this reviewer. |
 | `reasoning` | no | `low` \| `medium` \| `high`. |
 | `agentic` | no | `false` to run one-shot; omitted = agentic (the default). |
 | `profile` | no | Noise profile: `quiet` (blockers) \| `chill` (default) \| `assertive` (all). |
@@ -44,6 +45,12 @@ whose globs match a changed file and posts each as its own labeled review
 
 Globs are matched with `Bun.Glob` against repo-relative paths. `include` also
 composes with `--dir` (subdir scope).
+
+Top-level `fallbackModels` applies to every reviewer unless that reviewer sets
+its own list. Loupe passes the order through to Whip, which emits OpenRouter's
+`models` field alongside the primary `model`. OpenRouter fallbacks respond to
+model/provider errors; they do not recover a Whip turn cap or an empty
+successful stream.
 
 Run all matching reviewers, or one:
 

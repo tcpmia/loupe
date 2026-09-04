@@ -23,6 +23,7 @@ export type RunInput = {
   readonly subdir?: string;
   readonly dryRun?: boolean;
   readonly model?: string;
+  readonly fallbackModels?: readonly string[];
   readonly reasoning: ReasoningEffort;
   readonly guidance?: string;
   readonly reviewerName?: string;
@@ -83,6 +84,7 @@ export async function reviewPullRequest(
     subdir: input.subdir,
     dryRun: input.dryRun,
     model: input.model,
+    fallbackModels: input.fallbackModels,
     reasoning: input.reasoning,
     guidance: input.guidance,
     reviewerName: input.reviewerName,

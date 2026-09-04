@@ -95,6 +95,7 @@ export type Config = {
   readonly providers: readonly CredentialProvider[];
   readonly subdir?: string;
   readonly model: string;
+  readonly fallbackModels?: readonly string[];
   readonly reasoning: ReasoningEffort;
   readonly guidance?: string;
   readonly configPath?: string;
@@ -139,6 +140,7 @@ export function loadConfig(): Config {
     providers: buildProviders(env),
     subdir: env.LOUPE_DIR ?? file.dir,
     model: env.LOUPE_MODEL ?? file.model ?? "kimi-k3",
+    fallbackModels: file.fallbackModels,
     reasoning: asReasoning(env.LOUPE_REASONING) ?? file.reasoning ?? "low",
     guidance: env.LOUPE_PROMPT_FILE
       ? readFileSync(inWorkspace(env.LOUPE_PROMPT_FILE), "utf8")

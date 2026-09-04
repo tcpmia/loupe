@@ -167,6 +167,7 @@ program
         const settings = opts.config ? loadSettings(opts.config) : {};
         const harnessName = opts.harness ?? settings.harness ?? "whip";
         const model = opts.model ?? settings.model ?? "kimi-k3";
+        const fallbackModels = settings.fallbackModels;
         const reasoning = parseReasoning(
           opts.reasoning ?? settings.reasoning ?? "low",
         );
@@ -211,6 +212,7 @@ program
           skills,
           timezone,
           maxTurns,
+          fallbackModels,
           whipConfig: settings.whip,
         };
 
@@ -235,6 +237,7 @@ program
               exclude: r.exclude,
               agentic: r.agentic ?? opts.agentic,
               model: r.model ?? model,
+              fallbackModels: r.fallbackModels ?? fallbackModels,
               reasoning: r.reasoning ? parseReasoning(r.reasoning) : reasoning,
               profile: r.profile ?? profile,
               verify: r.verify ?? opts.verify,
