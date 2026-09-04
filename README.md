@@ -106,14 +106,15 @@ review (`🔍 loupe · migrations`). A reviewer whose globs match nothing is ski
 ```
 
 Per-reviewer keys: `prompt`/`promptFile`, `include`/`exclude`, `model`,
-`reasoning`, `profile`, `agentic`, `verify`, `ensemble`, `skills`,
+`fallbackModels`, `reasoning`, `profile`, `agentic`, `verify`, `ensemble`, `skills`,
 `pathInstructions`. Top-level `skills` apply to every reviewer.
 
 ### Top-level config — keep review policy out of the workflow
 
 The config file also carries the **review defaults** that used to be repeated in
 every workflow file: `harness`, `model`, `reasoning`, `profile`, `timezone`,
-`dir`, and `maxTurns` (the agentic tool-loop cap; also per-reviewer). Precedence
+`dir`, `maxTurns` (the agentic tool-loop cap), and `fallbackModels` (also
+per-reviewer). Precedence
 is **Action input / CLI flag → `.loupe.json` → built-in
 default**, so a workflow can still override, but by default the policy lives with
 the repo.
@@ -141,6 +142,25 @@ its env-var name is in the config.
   "reviewers": [{ "name": "bugs", "promptFile": "reviewers/bugs.md" }]
 }
 ```
+
+When Whip routes through OpenRouter, `fallbackModels` is an ordered failover
+list. Loupe passes it to Whip without changing the primary `model`:
+
+```json
+{
+  "harness": "whip",
+  "model": "openai/gpt-5",
+  "fallbackModels": [
+    "anthropic/claude-sonnet-4.5",
+    "google/gemini-2.5-pro"
+  ],
+  "reviewers": [{ "name": "bugs", "promptFile": "reviewers/bugs.md" }]
+}
+```
+
+A reviewer's own `fallbackModels` replaces the top-level list for that
+reviewer. Whip sends the ordered list as OpenRouter's `models` request field;
+it does not retry turn-limit or successful empty-stream results.
 
 With that, the whole workflow is just: checkout → install the harness binary →
 `context-labs/loupe@v0` with `config: .loupe.json` and the secret in `env`. See

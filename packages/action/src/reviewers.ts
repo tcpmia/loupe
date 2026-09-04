@@ -21,6 +21,8 @@ const reviewerSchema = z
     include: z.array(z.string()).optional(),
     exclude: z.array(z.string()).optional(),
     model: z.string().optional(),
+    /** Ordered OpenRouter fallbacks for this reviewer. */
+    fallbackModels: z.array(z.string().min(1)).min(1).optional(),
     reasoning: z.enum(["low", "medium", "high"]).optional(),
     /** Let this reviewer use tools to explore the checkout (needs a workdir). */
     agentic: z.boolean().optional(),
@@ -66,6 +68,7 @@ const configSchema = z.object({
   // with the repo's review policy instead of duplicated across workflow files.
   harness: z.string().optional(),
   model: z.string().optional(),
+  fallbackModels: z.array(z.string().min(1)).min(1).optional(),
   reasoning: z.enum(["low", "medium", "high"]).optional(),
   profile: z.enum(["quiet", "chill", "assertive"]).optional(),
   timezone: z.string().optional(),
@@ -79,6 +82,7 @@ const configSchema = z.object({
 export type LoupeSettings = {
   readonly harness?: string;
   readonly model?: string;
+  readonly fallbackModels?: readonly string[];
   readonly reasoning?: ReasoningEffort;
   readonly profile?: Profile;
   readonly timezone?: string;
@@ -94,6 +98,7 @@ export function loadSettings(configPath: string): LoupeSettings {
   return {
     harness: c.harness,
     model: c.model,
+    fallbackModels: c.fallbackModels,
     reasoning: c.reasoning,
     profile: c.profile,
     timezone: c.timezone,
@@ -109,6 +114,7 @@ export type Reviewer = {
   readonly include?: readonly string[];
   readonly exclude?: readonly string[];
   readonly model?: string;
+  readonly fallbackModels?: readonly string[];
   readonly reasoning?: ReasoningEffort;
   readonly agentic?: boolean;
   readonly profile?: Profile;
@@ -139,6 +145,7 @@ export function loadReviewers(configPath: string): Reviewer[] {
     include: r.include,
     exclude: r.exclude,
     model: r.model,
+    fallbackModels: r.fallbackModels,
     reasoning: r.reasoning,
     agentic: r.agentic,
     profile: r.profile,

@@ -39,6 +39,8 @@ export type HarnessContext = {
   readonly userPrompt: string;
   /** Model id, harness-specific (e.g. "kimi-k3", "claude-opus-4-8"). */
   readonly model?: string;
+  /** Ordered OpenRouter fallback model ids passed to whip. */
+  readonly fallbackModels?: readonly string[];
   /** Allow the agent to use tools and explore the checkout (vs diff-only). */
   readonly agentic?: boolean;
   readonly workdir: string;
@@ -306,6 +308,9 @@ export function whipHarness(): Harness {
         ctx.systemPrompt,
       ];
       if (ctx.model) args.push("-m", ctx.model);
+      if (ctx.fallbackModels?.length) {
+        args.push("-fallback-models", ctx.fallbackModels.join(","));
+      }
       const whipEnv = ctx.whipConfig ? materializeWhipHome(ctx.whipConfig) : {};
       const runCtx = { ...ctx, env: { ...ctx.env, ...whipEnv } };
       // Stable cache key → the provider reuses the cached prefix across runs.
