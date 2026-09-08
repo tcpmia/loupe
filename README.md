@@ -137,11 +137,16 @@ its env-var name is in the config.
       "baseUrl": "https://api.inference.net/v1",
       "apiKeyEnv": "INFERENCE_API_KEY"
     },
-    "models": ["kimi-k3", "glm-5.3-flash", "gpt-5.6-luna"]
+    "models": ["kimi-k3", "glm-5.3-flash", "gpt-5.6-luna"],
+    "subagentModels": ["glm-5.3-flash", "gpt-5.6-luna"]
   },
   "reviewers": [{ "name": "bugs", "promptFile": "reviewers/bugs.md" }]
 }
 ```
+
+`whip.subagentModels` controls the exact model names in Loupe's agentic
+subagent-panel instruction. Every entry must also appear in `whip.models`.
+Omit it to retain Loupe's built-in panel.
 
 When Whip routes through OpenRouter, `fallbackModels` is an ordered failover
 list. Loupe passes it to Whip without changing the primary `model`:

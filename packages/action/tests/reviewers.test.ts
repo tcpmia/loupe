@@ -41,3 +41,51 @@ describe("fallbackModels config", () => {
     expect(() => loadSettings(path)).toThrow();
   });
 });
+
+describe("whip subagentModels config", () => {
+  const provider = {
+    name: "openrouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    apiKeyEnv: "OPENROUTER_API_KEY",
+  };
+
+  it("preserves exact configured model names", () => {
+    const path = configFile({
+      whip: {
+        provider,
+        models: ["z-ai/glm-5.3-flash", "deepseek/deepseek-v4-pro-0813"],
+        subagentModels: ["z-ai/glm-5.3-flash", "deepseek/deepseek-v4-pro-0813"],
+      },
+      reviewers: [{ name: "x" }],
+    });
+
+    expect(loadSettings(path).whip?.subagentModels).toEqual([
+      "z-ai/glm-5.3-flash",
+      "deepseek/deepseek-v4-pro-0813",
+    ]);
+  });
+
+  it("rejects empty or unregistered subagent model lists", () => {
+    const empty = configFile({
+      whip: {
+        provider,
+        models: ["z-ai/glm-5.3-flash"],
+        subagentModels: [],
+      },
+      reviewers: [{ name: "x" }],
+    });
+    const unregistered = configFile({
+      whip: {
+        provider,
+        models: ["z-ai/glm-5.3-flash"],
+        subagentModels: ["deepseek/deepseek-v4-pro-0813"],
+      },
+      reviewers: [{ name: "x" }],
+    });
+
+    expect(() => loadSettings(empty)).toThrow();
+    expect(() => loadSettings(unregistered)).toThrow(
+      "subagentModels entries must also appear in models",
+    );
+  });
+});

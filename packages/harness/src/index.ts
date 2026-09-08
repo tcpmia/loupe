@@ -24,6 +24,8 @@ export type WhipConfig = {
   };
   /** Models whip may route to (the panel). The first is the default if unset. */
   readonly models: readonly string[];
+  /** Exact model names Loupe tells reviewers to use for subagent panels. */
+  readonly subagentModels?: readonly string[];
   /** Default model; defaults to the review's model, else the first in `models`. */
   readonly defaultModel?: string;
 };

@@ -17,7 +17,8 @@
       "glm-5.3-flash",
       "glm-5.2-fast",
       "deepseek-v4-pro-0813"
-    ]
+    ],
+    "subagentModels": ["glm-5.3-flash", "glm-5.2-fast", "deepseek-v4-pro-0813"]
   },
   "reviewers": [
     {

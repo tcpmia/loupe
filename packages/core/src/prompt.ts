@@ -92,7 +92,19 @@ You are running headless with NO repository access. Do NOT call tools or attempt
 to read files — you cannot, and any tool call wastes the run. Base the entire
 review on the diff in the user message.`.trim();
 
-const AGENTIC_DIRECTIVE = `
+const DEFAULT_SUBAGENT_MODELS = [
+  "glm-5.3-flash",
+  "glm-5.2-fast",
+  "deepseek-v4-pro-0813",
+] as const;
+
+function buildAgenticDirective(subagentModels?: readonly string[]): string {
+  const models = subagentModels ?? DEFAULT_SUBAGENT_MODELS;
+  const modelInstruction = subagentModels
+    ? `Use these exact configured model names: ${models.join(", ")}.`
+    : `Use a mix of ${models.join(", ")}.`;
+
+  return `
 You HAVE repository access: the full checkout is your working directory and you
 may use your tools to read files. The user message gives you the LIST of changed
 files (not the full diff) and the path to a file holding the complete diff —
@@ -110,13 +122,14 @@ serially yourself. Spawn many; they are cheap and fast.
 Convene a PANEL OF MODELS to pressure-test anything important. When you suspect a
 real bug (especially a blocker), do NOT trust a single opinion: spawn 2-3
 subagents on DIFFERENT models to independently confirm or refute it, and only
-report it if the panel agrees. Diversify the models across subagents — use a mix
-of glm-5.3-flash, glm-5.2-fast, and deepseek-v4-pro-0813 — so you get genuinely
-independent judgment, not the same model agreeing with itself.
+report it if the panel agrees. Diversify the models across subagents.
+${modelInstruction} This gives you genuinely independent judgment, not the same
+model agreeing with itself.
 
 Be efficient with your OWN turns: delegate exploration to subagents, then
 synthesize. Once the panel has confirmed the findings, STOP and respond with
 ONLY the final JSON object — do not keep exploring.`.trim();
+}
 
 const REASONING_NOTE: Record<ReasoningEffort, string> = {
   low: "Reasoning effort: low. Do a quick pass; flag only obvious, high-confidence issues.",
@@ -140,6 +153,8 @@ export function buildSystemPrompt(opts: {
   /** Repo convention docs (CLAUDE.md/AGENTS.md/…). Stable per repo → kept in the
    * system prompt so it stays a cacheable prefix across PRs. */
   conventions?: string;
+  /** Exact configured model names available for agentic subagent panels. */
+  subagentModels?: readonly string[];
 }): string {
   const skillsBlock =
     opts.skills && opts.skills.length > 0
@@ -158,7 +173,9 @@ export function buildSystemPrompt(opts: {
     conventionsBlock,
     REASONING_NOTE[opts.reasoning],
     PROFILE_DIRECTIVE[opts.profile ?? "chill"],
-    opts.agentic ? AGENTIC_DIRECTIVE : HEADLESS_DIRECTIVE,
+    opts.agentic
+      ? buildAgenticDirective(opts.subagentModels)
+      : HEADLESS_DIRECTIVE,
     OUTPUT_CONTRACT,
   ]
     .filter(Boolean)

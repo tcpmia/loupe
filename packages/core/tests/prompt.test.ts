@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { renderFileTree, type DiffFile } from "../src/diff";
-import { buildUserPrompt } from "../src/prompt";
+import { buildSystemPrompt, buildUserPrompt } from "../src/prompt";
 
 const files: DiffFile[] = [
   { path: "src/a.ts", patch: "@@ -1,1 +1,2 @@\n line\n+added line\n-removed" },
@@ -34,5 +34,35 @@ describe("buildUserPrompt", () => {
     expect(p).toContain("- src/a.ts (+1 −1)");
     expect(p).toContain("/tmp/x/pr.diff");
     expect(p).not.toContain("+added line"); // the diff body is NOT inlined
+  });
+});
+
+describe("buildSystemPrompt", () => {
+  it("retains the built-in subagent panel when none is configured", () => {
+    const prompt = buildSystemPrompt({
+      reasoning: "medium",
+      agentic: true,
+    });
+
+    expect(prompt).toContain(
+      "Use a mix of glm-5.3-flash, glm-5.2-fast, deepseek-v4-pro-0813.",
+    );
+  });
+
+  it("uses exact configured model names for agentic subagent panels", () => {
+    const prompt = buildSystemPrompt({
+      reasoning: "medium",
+      agentic: true,
+      subagentModels: [
+        "z-ai/glm-5.3-flash",
+        "z-ai/glm-5.2",
+        "deepseek/deepseek-v4-pro-0813",
+      ],
+    });
+
+    expect(prompt).toContain(
+      "Use these exact configured model names: z-ai/glm-5.3-flash, z-ai/glm-5.2, deepseek/deepseek-v4-pro-0813.",
+    );
+    expect(prompt).not.toContain("glm-5.2-fast");
   });
 });

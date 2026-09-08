@@ -48,16 +48,26 @@ const reviewerSchema = z
 /** whip provider + model panel, so the review workflow needn't hand-write
  * ~/.whip/config.json in a CI step. loupe materializes it into a throwaway
  * WHIP_HOME at review time. */
-const whipConfigSchema = z.object({
-  provider: z.object({
-    name: z.string().min(1),
-    baseUrl: z.string().min(1),
-    apiKeyEnv: z.string().min(1),
-    label: z.string().optional(),
-  }),
-  models: z.array(z.string().min(1)).min(1),
-  defaultModel: z.string().optional(),
-});
+const whipConfigSchema = z
+  .object({
+    provider: z.object({
+      name: z.string().min(1),
+      baseUrl: z.string().min(1),
+      apiKeyEnv: z.string().min(1),
+      label: z.string().optional(),
+    }),
+    models: z.array(z.string().min(1)).min(1),
+    subagentModels: z.array(z.string().min(1)).min(1).optional(),
+    defaultModel: z.string().optional(),
+  })
+  .refine(
+    ({ models, subagentModels }) =>
+      subagentModels?.every((model) => models.includes(model)) ?? true,
+    {
+      message: "subagentModels entries must also appear in models",
+      path: ["subagentModels"],
+    },
+  );
 
 const configSchema = z.object({
   reviewers: z.array(reviewerSchema).min(1),
