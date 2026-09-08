@@ -138,7 +138,7 @@ its env-var name is in the config.
       "apiKeyEnv": "INFERENCE_API_KEY"
     },
     "models": ["kimi-k3", "glm-5.3-flash", "gpt-5.6-luna"],
-    "subagentModels": ["glm-5.3-flash", "gpt-5.6-luna"]
+    "subagentModels": ["kimi-k3", "glm-5.3-flash", "gpt-5.6-luna"]
   },
   "reviewers": [{ "name": "bugs", "promptFile": "reviewers/bugs.md" }]
 }
