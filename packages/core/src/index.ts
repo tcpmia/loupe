@@ -257,6 +257,7 @@ export async function runReview(req: ReviewRequest): Promise<ReviewResult> {
     profile,
     skills,
     conventions: conventions.text,
+    subagentModels: req.whipConfig?.subagentModels,
   });
   // The harness runs where the repo is checked out. Scope to the subdir only if
   // it actually exists on disk; fall back to the workdir (or cwd) so a run
@@ -325,6 +326,7 @@ export async function runReview(req: ReviewRequest): Promise<ReviewResult> {
               profile,
               skills,
               conventions: conventions.text,
+              subagentModels: req.whipConfig?.subagentModels,
             }),
         userPrompt: useAgentic ? agenticUserPrompt : headlessUserPrompt,
         model,

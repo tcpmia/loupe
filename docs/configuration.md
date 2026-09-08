@@ -52,6 +52,10 @@ its own list. Loupe passes the order through to Whip, which emits OpenRouter's
 model/provider errors; they do not recover a Whip turn cap or an empty
 successful stream.
 
+`whip.subagentModels` replaces the model names in Loupe's agentic panel
+instruction with exact configured routes. Every entry must also appear in
+`whip.models`. Omit it to use Loupe's built-in panel.
+
 Run all matching reviewers, or one:
 
 ```bash

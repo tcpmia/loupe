@@ -16,7 +16,16 @@
       "kimi-k3-fast",
       "glm-5.3-flash",
       "glm-5.2-fast",
-      "deepseek-v4-pro-0813"
+      "deepseek-v4-pro-0813",
+      "gpt-5.6-luna"
+    ],
+    "subagentModels": [
+      "kimi-k3",
+      "kimi-k3-fast",
+      "glm-5.3-flash",
+      "glm-5.2-fast",
+      "deepseek-v4-pro-0813",
+      "gpt-5.6-luna"
     ]
   },
   "reviewers": [
