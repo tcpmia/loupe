@@ -132,9 +132,12 @@ Two scopes:
   filter.
 - **Path instructions** — per-glob natural-language guidance injected only when
   a matching file changed (e.g. "in `**/*.sql`, flag full-table locks").
-- **Incremental review** — on a re-review, loupe reviews only the files changed
-  since its last review of the PR and replaces only those comments; comments on
-  untouched files are kept. `--full` / `full: true` forces a whole-PR review.
+- **Incremental review** — on a re-review, loupe reviews only what the PR's
+  new commits changed since its last review, and earlier comments stay where
+  they are. `--full` / `full: true` forces a whole-PR review.
+- **No repeats** — every run is told the findings loupe already posted on the
+  PR, by any reviewer, and the verification pass rejects a finding that repeats
+  one. A finding is raised once and tracked in its thread.
 
 ## What a review looks like
 

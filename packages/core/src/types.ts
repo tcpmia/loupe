@@ -95,3 +95,10 @@ export const verdictSchema = z.object({
 export const verificationSchema = z.object({
   verdicts: z.array(verdictSchema).default([]),
 });
+
+/** A finding a loupe reviewer already posted on this PR. */
+export type PriorFinding = {
+  readonly path: string;
+  readonly line: number | null;
+  readonly body: string;
+};

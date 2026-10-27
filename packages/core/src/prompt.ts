@@ -1,5 +1,5 @@
 import { renderDiff, renderFileTree, type DiffFile } from "./diff";
-import type { Finding, Profile } from "./types";
+import type { Finding, PriorFinding, Profile } from "./types";
 
 export type ReasoningEffort = "low" | "medium" | "high";
 
@@ -224,7 +224,20 @@ export type UserPromptInput = {
    * reviews, where the full diff must be inlined.
    */
   readonly diffPath?: string;
+  /** A re-review: the files carry only what the PR's new commits changed. */
+  readonly newCommitsOnly?: boolean;
+  /** Findings loupe already posted on this PR, to leave out. */
+  readonly priorFindings?: readonly PriorFinding[];
 };
+
+function renderPriorFindings(prior: readonly PriorFinding[]): string {
+  return prior
+    .map((f) => {
+      const line = f.body.split("\n").find((l) => l.trim()) ?? "";
+      return `- ${f.path}${f.line ? `:${f.line}` : ""}: ${line.slice(0, 200)}`;
+    })
+    .join("\n");
+}
 
 /** The per-PR user message: environment, metadata, per-path notes, and either
  * the full inline diff (headless) or a changed-file tree + a pointer to the
@@ -235,6 +248,12 @@ export function buildUserPrompt(input: UserPromptInput): string {
     ? `Extra instructions for some of the changed files:\n${input.pathInstructions
         .map((i) => `- ${i}`)
         .join("\n")}`
+    : "";
+  const rereview = input.newCommitsOnly
+    ? "This is a re-review. The diff holds only what the PR's new commits changed since the last review, and the rest of the PR was reviewed already. Review the new commits; read the rest of the PR only as context."
+    : "";
+  const prior = input.priorFindings?.length
+    ? `Already raised on this PR. Never report any of these again, whether or not the code fixed them; their threads already track them:\n${renderPriorFindings(input.priorFindings)}`
     : "";
   const diffSection = input.diffPath
     ? [
@@ -248,6 +267,8 @@ export function buildUserPrompt(input: UserPromptInput): string {
     `PR title: ${input.title}`,
     input.description ? `PR description:\n${input.description}` : "",
     pathNotes,
+    rereview,
+    prior,
     diffSection,
   ]
     .filter(Boolean)
@@ -317,9 +338,22 @@ export function buildFixUserPrompt(
 export function buildVerifyUserPrompt(
   findings: readonly Finding[],
   files: readonly DiffFile[],
+  priorFindings: readonly PriorFinding[] = [],
 ): string {
   const list = findings
     .map((f, i) => `#${i} [${f.severity}] ${f.path}:${f.line}\n${f.body}`)
     .join("\n\n");
-  return ["Diff:", renderDiff(files), "Findings to verify:", list].join("\n\n");
+  const prior = priorFindings.length
+    ? [
+        "Already raised on this PR. Reject any finding that repeats one of these:",
+        renderPriorFindings(priorFindings),
+      ]
+    : [];
+  return [
+    "Diff:",
+    renderDiff(files),
+    ...prior,
+    "Findings to verify:",
+    list,
+  ].join("\n\n");
 }
