@@ -12,11 +12,12 @@ import type { Harness, WhipConfig } from "@loupe/harness";
 import type { Logger } from "@loupe/logger";
 
 import {
-  changedFilesBetween,
   fetchConventions,
+  fetchPriorFindings,
   fetchPullContext,
   getLastReviewedSha,
   makeOctokit,
+  patchesBetween,
   postReview,
   type PullRef,
 } from "./github";
@@ -25,6 +26,7 @@ import { parseReviewOutput, parseVerification } from "./parse";
 import {
   severitiesForProfile,
   type Finding,
+  type PriorFinding,
   type Profile,
   type ReviewOutput,
 } from "./types";
@@ -191,11 +193,12 @@ export async function runReview(req: ReviewRequest): Promise<ReviewResult> {
     return emptyResult("No changed files in scope.");
   }
 
-  // Incremental review: only re-review files changed since this reviewer's last
-  // review of the PR, and only replace comments on those files (comments on
-  // untouched files are kept). Full review (--full / first run) reviews all.
+  // Incremental review: after the first, review only what the PR's new commits
+  // changed since this reviewer's last review. `files` keeps the PR's patches,
+  // which findings anchor to; `reviewFiles` carries the new commits' patches,
+  // which the reviewer reads. Full review (--full / first run) reviews all.
   let files = scopedFiles;
-  let refreshPaths: Set<string> | undefined;
+  let reviewFiles: readonly DiffFile[] = scopedFiles;
   if (!req.full) {
     const priorSha = await getLastReviewedSha(
       octokit,
@@ -204,14 +207,17 @@ export async function runReview(req: ReviewRequest): Promise<ReviewResult> {
     );
     if (priorSha && priorSha !== pull.headSha) {
       try {
-        const delta = await changedFilesBetween(
+        const delta = await patchesBetween(
           octokit,
           req.ref,
           priorSha,
           pull.headSha,
         );
         files = scopedFiles.filter((f) => delta.has(f.path));
-        refreshPaths = new Set(files.map((f) => f.path));
+        reviewFiles = files.map((f) => ({
+          path: f.path,
+          patch: delta.get(f.path) ?? f.patch,
+        }));
         logger.info("Incremental review", {
           priorSha: priorSha.slice(0, 9),
           headSha: pull.headSha.slice(0, 9),
@@ -228,9 +234,14 @@ export async function runReview(req: ReviewRequest): Promise<ReviewResult> {
           error: err instanceof Error ? err.message : String(err),
         });
         files = scopedFiles;
+        reviewFiles = scopedFiles;
       }
     }
   }
+  const newCommitsOnly = reviewFiles !== scopedFiles;
+  // Never report a finding twice: every reviewer is told what loupe already
+  // posted on this PR, by any reviewer, fixed or not.
+  const priorFindings = await fetchPriorFindings(octokit, req.ref);
 
   // Agentic (explore the checkout with tools) is the default; a reviewer opts
   // out with agentic: false to run one-shot from the diff alone.
@@ -280,11 +291,13 @@ export async function runReview(req: ReviewRequest): Promise<ReviewResult> {
   // file to explore — so the (often huge) diff isn't inlined into every turn.
   // Headless reviews (and agentic with no checkout) inline the full diff.
   const treeMode = agentic && existsSync(scoped);
-  const diffPath = treeMode ? writeDiffFile(files, logger) : undefined;
+  const diffPath = treeMode ? writeDiffFile(reviewFiles, logger) : undefined;
   const commonPrompt = {
     title: pull.title,
     description: pull.description,
-    files,
+    files: reviewFiles,
+    newCommitsOnly,
+    priorFindings,
     pathInstructions,
     timezone: req.timezone,
   };
@@ -395,7 +408,13 @@ export async function runReview(req: ReviewRequest): Promise<ReviewResult> {
     inline = one.inline;
     // Verification pass: a cheap second opinion that drops false positives.
     if (req.verify !== false && inline.length > 0) {
-      inline = await verifyInline(req, files, inline, harnessCwd);
+      inline = await verifyInline(
+        req,
+        files,
+        inline,
+        priorFindings,
+        harnessCwd,
+      );
     }
   }
 
@@ -441,10 +460,9 @@ export async function runReview(req: ReviewRequest): Promise<ReviewResult> {
     return result;
   }
 
-  await postReview(octokit, req.ref, reviewForPost, inline, dropped, logger, {
+  await postReview(octokit, req.ref, reviewForPost, inline, dropped, {
     reviewerName: req.reviewerName,
     headSha: pull.headSha,
-    refreshPaths,
     fileCount: files.length,
   });
   logger.info("Posted review", {
@@ -463,12 +481,13 @@ async function verifyInline(
   req: ReviewRequest,
   files: readonly { path: string; patch: string | undefined }[],
   findings: readonly Finding[],
+  priorFindings: readonly PriorFinding[],
   harnessCwd: string,
 ): Promise<Finding[]> {
   try {
     const stdout = await req.harness.review({
       systemPrompt: buildVerifySystemPrompt(),
-      userPrompt: buildVerifyUserPrompt(findings, files),
+      userPrompt: buildVerifyUserPrompt(findings, files, priorFindings),
       model: req.model,
       fallbackModels: req.fallbackModels,
       agentic: false,

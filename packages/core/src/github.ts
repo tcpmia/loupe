@@ -3,7 +3,7 @@ import { Octokit } from "@octokit/rest";
 import type { Logger } from "@loupe/logger";
 
 import type { DiffFile } from "./diff";
-import type { Finding, ReviewOutput } from "./types";
+import type { Finding, PriorFinding, ReviewOutput } from "./types";
 
 export type PullRef = {
   readonly owner: string;
@@ -95,20 +95,50 @@ export async function postIssueComment(
   });
 }
 
-/** Files changed between two commits (the incremental-review delta). */
-export async function changedFilesBetween(
+/**
+ * Each file's patch between two commits: what the PR's new commits changed
+ * since a review of `base`. A file GitHub sends no patch for (binary, too
+ * large) maps to undefined.
+ */
+export async function patchesBetween(
   octokit: Octokit,
   ref: PullRef,
   base: string,
   head: string,
-): Promise<Set<string>> {
+): Promise<Map<string, string | undefined>> {
   const { data } = await octokit.repos.compareCommits({
     owner: ref.owner,
     repo: ref.repo,
     base,
     head,
   });
-  return new Set((data.files ?? []).map((f) => f.filename));
+  return new Map((data.files ?? []).map((f) => [f.filename, f.patch]));
+}
+
+/**
+ * Every inline finding any loupe reviewer has posted on this PR, so a
+ * re-review can leave them out rather than report them again. Best-effort: an
+ * error reads as none.
+ */
+export async function fetchPriorFindings(
+  octokit: Octokit,
+  ref: PullRef,
+): Promise<PriorFinding[]> {
+  try {
+    const comments = await octokit.paginate(octokit.pulls.listReviewComments, {
+      ...ref,
+      per_page: 100,
+    });
+    return comments
+      .filter((c) => c.body.includes(MARKER_START))
+      .map((c) => ({
+        path: c.path,
+        line: c.line ?? c.original_line ?? null,
+        body: c.body.slice(0, c.body.indexOf(MARKER_START)).trim(),
+      }));
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -153,54 +183,13 @@ export async function fetchConventions(
 }
 
 /** Per-reviewer marker prefix; the sha is appended per run. Comments and the
- * review body carry it so a later run can find and clean up its own output. */
+ * review body carry it so a later run can find what loupe already posted. */
+const MARKER_START = "<!-- loupe:";
 function markerPrefix(reviewerName: string | undefined): string {
-  return `<!-- loupe:${reviewerName ?? "default"} `;
+  return `${MARKER_START}${reviewerName ?? "default"} `;
 }
 function makeMarker(reviewerName: string | undefined, sha: string): string {
   return `${markerPrefix(reviewerName)}sha=${sha} -->`;
-}
-
-/**
- * Delete this reviewer's inline comments from a previous run so re-reviews
- * replace rather than duplicate. When `refreshPaths` is given (incremental
- * review), only comments on those files are removed — comments on files
- * unchanged since the last review are kept. Best-effort: never blocks posting.
- */
-async function deletePriorComments(
-  octokit: Octokit,
-  ref: PullRef,
-  reviewerName: string | undefined,
-  logger: Logger,
-  refreshPaths?: ReadonlySet<string>,
-): Promise<void> {
-  const prefix = markerPrefix(reviewerName);
-  try {
-    const comments = await octokit.paginate(octokit.pulls.listReviewComments, {
-      owner: ref.owner,
-      repo: ref.repo,
-      pull_number: ref.pull_number,
-      per_page: 100,
-    });
-    const mine = comments.filter(
-      (c) =>
-        c.body.includes(prefix) && (!refreshPaths || refreshPaths.has(c.path)),
-    );
-    for (const c of mine) {
-      await octokit.pulls.deleteReviewComment({
-        owner: ref.owner,
-        repo: ref.repo,
-        comment_id: c.id,
-      });
-    }
-    if (mine.length > 0) {
-      logger.debug("Removed prior loupe comments", { count: mine.length });
-    }
-  } catch (err) {
-    logger.warn("Could not clean up prior loupe comments", {
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
 }
 
 const SEV_EMOJI: Record<Finding["severity"], string> = {
@@ -279,16 +268,14 @@ function renderReviewBody(
 /**
  * Post one review with inline comments. Uses REQUEST_CHANGES when any inline
  * finding is a blocker, otherwise COMMENT — never APPROVE (a bot shouldn't be a
- * required approver). Off-diff findings are appended to the summary body. First
- * clears this reviewer's comments from the previous run so re-reviews replace
- * rather than accumulate.
+ * required approver). Off-diff findings are appended to the summary body.
+ * Earlier runs' comments stay: their threads may hold replies, and a re-review
+ * is told what they already said rather than replacing them.
  */
 export type PostReviewOptions = {
   readonly reviewerName?: string;
   /** PR head SHA to stamp in the marker (for incremental review next time). */
   readonly headSha: string;
-  /** Incremental review: only replace prior comments on these files. */
-  readonly refreshPaths?: ReadonlySet<string>;
   /** Files in scope, for the stat line. */
   readonly fileCount: number;
 };
@@ -299,17 +286,8 @@ export async function postReview(
   review: ReviewOutput,
   inline: readonly Finding[],
   dropped: readonly Finding[],
-  logger: Logger,
   opts: PostReviewOptions,
 ): Promise<void> {
-  await deletePriorComments(
-    octokit,
-    ref,
-    opts.reviewerName,
-    logger,
-    opts.refreshPaths,
-  );
-
   const hasBlocker = [...inline, ...review.concerns].some(
     (f) => f.severity === "blocker",
   );
